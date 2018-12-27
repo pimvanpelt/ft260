@@ -24,5 +24,22 @@ int log_print_prefix(enum cs_log_level l, const char *func, const char *file);
     printf("\r\n");                                            \
   } while (0)
 
-
-void log_hexdump(enum cs_log_level l, const char *prefix, const uint8_t *data, const uint16_t len);
+#define LOG_HEXDUMP(l, prefix, data, len)        \
+  do                                             \
+  {                                              \
+    log_print_prefix(l, __func__, __FILE__);     \
+    printf("%s: %d bytes\r\n", prefix, len);     \
+    for (int i = 0; i < len; i++) {              \
+      if (i % 16 == 0) {                         \
+        log_print_prefix(l, __func__, __FILE__); \
+        printf("%s: ", prefix);                  \
+      }                                          \
+      printf("%02X ", data[i]);                  \
+      if (i % 16 == 15) {                        \
+        printf("\r\n");                          \
+      }                                          \
+    }                                            \
+    if (len % 16 != 0) {                         \
+      printf("\r\n");                            \
+    }                                            \
+  } while (0)

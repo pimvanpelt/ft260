@@ -52,22 +52,3 @@ int log_print_prefix(enum cs_log_level l, const char *func, const char *file) {
   printf("%-5s %-20s %-20s| ", ll_str, ll_file, ll_func);
   return 1;
 }
-
-void log_hexdump(enum cs_log_level l, const char *prefix, const uint8_t *data, const uint16_t len) {
-  uint16_t i;
-
-  LOG(l, ("%s of %d bytes follows:", prefix, len));
-
-  for (i = 0; i < len; i++) {
-    if (i % 16 == 0) {
-      log_print_prefix(l, __func__, __FILE__);
-    }
-    printf("0x%02x ", data[i]);
-    if (i % 16 == 15) {
-      printf("\r\n");
-    }
-  }
-  if (len % 16 != 0) {
-    printf("\r\n");
-  }
-}
