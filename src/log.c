@@ -53,14 +53,14 @@ int log_print_prefix(enum cs_log_level l, const char *func, const char *file) {
   return 1;
 }
 
-void log_hexdump(const char *prefix, const uint8_t *data, const uint16_t len) {
+void log_hexdump(enum cs_log_level l, const char *prefix, const uint8_t *data, const uint16_t len) {
   uint16_t i;
 
-  LOG(LL_INFO, ("%s of %d bytes follows:", prefix, len));
+  LOG(l, ("%s of %d bytes follows:", prefix, len));
 
   for (i = 0; i < len; i++) {
     if (i % 16 == 0) {
-      log_print_prefix(LL_INFO, __func__, __FILE__);
+      log_print_prefix(l, __func__, __FILE__);
     }
     printf("0x%02x ", data[i]);
     if (i % 16 == 15) {

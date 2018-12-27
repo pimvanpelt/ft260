@@ -167,7 +167,7 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
   struct ft260_dev *d = calloc(1, sizeof(struct ft260_dev));
   int      res;
   char *   hidpath = (char *)devpath;
-  uint8_t  buf[3];
+  uint8_t  buf[26];
   uint16_t freq;
 
   if (!hidpath) {
@@ -204,6 +204,27 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
     return NULL;
   }
 
+  // Read the chip ID
+  buf[0] = 0xA0; // CHIP_VERSION_ID
+  if (!ft260_hid_io(d, INPUT, buf, 13)) {
+    LOG(LL_ERROR, ("Could not read FT260 chip ID"));
+    close(d->fd);
+    free(d);
+    return NULL;
+  }
+  log_hexdump(LL_DEBUG, "ID", buf, 13);
+
+  // Read the System Status
+  buf[0] = 0xA1; // SYSTEM_STATUS_ID
+  if (!ft260_hid_io(d, INPUT, buf, 26)) {
+    LOG(LL_ERROR, ("Could not read FT260 system status"));
+    close(d->fd);
+    free(d);
+    return NULL;
+  }
+  log_hexdump(LL_DEBUG, "Status", buf, 26);
+
+  // Reset I2C
   if (!ft260_i2c_reset(d)) {
     LOG(LL_ERROR, ("Could not set reset FT260"));
     close(d->fd);
@@ -442,7 +463,7 @@ int main(int argc, char **argv) {
   buf[5] = 'b';
   buf[6] = 'c';
   res    = write(d->fd, buf, 7);
-  log_hexdump("Write", buf, 7);
+  log_hexdump(LL_DEBUG, "Write", buf, 7);
   LOG(LL_INFO, ("Write %d bytes to i2caddr=0x%02x: %s", res, 0x22, strerror(errno)));
 
 
@@ -455,11 +476,11 @@ int main(int argc, char **argv) {
     buf[4] = 0;
 
     res = write(d->fd, buf, 5);
-    log_hexdump("Write", buf, 5);
+    log_hexdump(LL_DEBUG, "Write", buf, 5);
     LOG(LL_INFO, ("Write %d bytes to i2caddr=0x%02x: %s", res, i, strerror(errno)));
 
     res = read(d->fd, buf, 64);
-    log_hexdump("Read", buf, 64);
+    log_hexdump(LL_DEBUG, "Read", buf, 64);
     LOG(LL_INFO, ("Read %d bytes from i2caddr=0x%02x: %s", res, i, strerror(errno)));
   }
 

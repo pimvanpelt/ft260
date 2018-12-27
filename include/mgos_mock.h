@@ -25,4 +25,4 @@ int log_print_prefix(enum cs_log_level l, const char *func, const char *file);
   } while (0)
 
 
-void log_hexdump(const char *prefix, const uint8_t *data, const uint16_t len);
+void log_hexdump(enum cs_log_level l, const char *prefix, const uint8_t *data, const uint16_t len);
