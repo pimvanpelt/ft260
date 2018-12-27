@@ -459,24 +459,26 @@ int main(int argc, char **argv) {
   }
 
 
-  /* Send a Report to the Device */
-  memset(buf, 0, sizeof(buf));
-  buf[0] = 0xD0; /* I2C write */
-  buf[1] = 0x22; /* Slave address */
-  buf[2] = 0x06; /* Start and Stop */
-  buf[3] = 0x03; /* data len */
-  buf[4] = 'a';
-  buf[5] = 'b';
-  buf[6] = 'c';
-  res    = write(d->fd, buf, 7);
-  if (res > 0) {
-    LOG_HEXDUMP(LL_DEBUG, "Write Buffer", buf, 7);
-  }
-  LOG(LL_INFO, ("Write %d bytes to i2caddr=0x%02x: %s", res, 0x22, strerror(errno)));
+  /*
+   * // Send a Report to the Device
+   * memset(buf, 0, sizeof(buf));
+   * buf[0] = 0xD0; // I2C write
+   * buf[1] = 0x22; // Slave address
+   * buf[2] = 0x06; // Start and Stop
+   * buf[3] = 0x03; // data len
+   * buf[4] = 'a';
+   * buf[5] = 'b';
+   * buf[6] = 'c';
+   * res    = write(d->fd, buf, 7);
+   * if (res > 0) {
+   * LOG_HEXDUMP(LL_DEBUG, "Write Buffer", buf, 7);
+   * }
+   * LOG(LL_INFO, ("Write %d bytes to i2caddr=0x%02x: %s", res, 0x22, strerror(errno)));
+   */
 
 
   // Scan the bus
-  for (int i = 1; i < 127; i++) {
+  for (int i = 1; i <= 127; i++) {
     memset(buf, 0, sizeof(buf));
     buf[0] = 0xC2;
     buf[1] = i;
@@ -485,17 +487,21 @@ int main(int argc, char **argv) {
     buf[4] = 0;
 
     res = write(d->fd, buf, 5);
+    LOG(LL_INFO, ("write()=%d bytes to i2caddr=0x%02x: %s", res, i, res < 0 ? strerror(errno) : "OK"));
     if (res > 0) {
       LOG_HEXDUMP(LL_DEBUG, "Write Buffer", buf, res);
+    } else {
+      ft260_i2c_reset(d);
     }
-    LOG(LL_INFO, ("Write %d bytes to i2caddr=0x%02x: %s", res, i, strerror(errno)));
 
     memset(buf, 0, sizeof(buf));
     res = read(d->fd, buf, 64);
+    LOG(LL_INFO, ("read()=%d bytes from i2caddr=0x%02x: %s", res, i, res < 0 ? strerror(errno) : "OK"));
     if (res > 0) {
       LOG_HEXDUMP(LL_DEBUG, "Read Buffer", buf, res);
+    } else {
+      ft260_i2c_reset(d);
     }
-    LOG(LL_INFO, ("Read %d bytes from i2caddr=0x%02x: %s", res, i, strerror(errno)));
   }
 
   if (!ft260_i2c_destroy(&d)) {
