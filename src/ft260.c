@@ -132,6 +132,7 @@ bool ft260_i2c_get_speed(struct ft260_dev *d, uint16_t *freq_khz) {
 bool ft260_i2c_get_status(struct ft260_dev *d, uint8_t *status) {
   uint8_t buf[5];
 
+  memset(buf, 0, sizeof(buf));
   buf[0] = 0xC0; // GET STATUS
   if (!ft260_hid_io(d, INPUT, buf, sizeof(buf))) {
     return false;
@@ -148,6 +149,7 @@ bool ft260_i2c_get_status(struct ft260_dev *d, uint8_t *status) {
 bool ft260_i2c_set_speed(struct ft260_dev *d, const uint16_t freq_khz) {
   uint8_t buf[4];
 
+  memset(buf, 0, sizeof(buf));
   buf[0] = 0xA1;            // SYSTEM_SETTING_ID
   buf[1] = 0x22;            // I2C_SPEED
   buf[2] = freq_khz >> 8;   // MSB
@@ -205,6 +207,7 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
   }
 
   // Read the chip ID
+  memset(buf, 0, sizeof(buf));
   buf[0] = 0xA0; // CHIP_VERSION_ID
   if (!ft260_hid_io(d, INPUT, buf, 13)) {
     LOG(LL_ERROR, ("Could not read FT260 chip ID"));
@@ -215,6 +218,7 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
   LOG_HEXDUMP(LL_DEBUG, "Chip ID", buf, 13);
 
   // Read the System Status
+  memset(buf, 0, sizeof(buf));
   buf[0] = 0xA1; // SYSTEM_STATUS_ID
   if (!ft260_hid_io(d, INPUT, buf, 26)) {
     LOG(LL_ERROR, ("Could not read FT260 system status"));
@@ -258,6 +262,7 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
 bool ft260_i2c_reset(struct ft260_dev *d) {
   uint8_t buf[2];
 
+  memset(buf, 0, sizeof(buf));
   buf[0] = 0xA1;            /* SYSTEM_SETTING_ID */
   buf[1] = 0x20;            /* RESET_I2C */
   return ft260_hid_io(d, OUTPUT, buf, sizeof(buf));
@@ -455,6 +460,7 @@ int main(int argc, char **argv) {
 
 
   /* Send a Report to the Device */
+  memset(buf, 0, sizeof(buf));
   buf[0] = 0xD0; /* I2C write */
   buf[1] = 0x22; /* Slave address */
   buf[2] = 0x06; /* Start and Stop */
@@ -471,6 +477,7 @@ int main(int argc, char **argv) {
 
   // Scan the bus
   for (int i = 1; i < 127; i++) {
+    memset(buf, 0, sizeof(buf));
     buf[0] = 0xC2;
     buf[1] = i;
     buf[2] = 0x06;
@@ -483,6 +490,7 @@ int main(int argc, char **argv) {
     }
     LOG(LL_INFO, ("Write %d bytes to i2caddr=0x%02x: %s", res, i, strerror(errno)));
 
+    memset(buf, 0, sizeof(buf));
     res = read(d->fd, buf, 64);
     if (res > 0) {
       LOG_HEXDUMP(LL_DEBUG, "Read Buffer", buf, res);
