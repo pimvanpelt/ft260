@@ -21,6 +21,53 @@ static const char *ft260_bus_type_str(int bus) {
   }
 }
 
+/* Send or retrieve a feature to/from the HID.
+ *
+ * direction:  0 is output, 1 = input
+ * buf/buflen: Will write or read 'buflen' bytes from/to 'buf'.
+ *
+ * Returns true if successful, false otherwise.
+ */
+static bool ft260_hid_io(struct ft260_dev *d, const enum ft260_feature_direction dir, uint8_t *buf, uint8_t buflen) {
+  int res;
+
+  if (!d || d->fd < 0) {
+    return false;
+  }
+  if (dir == OUTPUT) {
+    res = ioctl(d->fd, HIDIOCSFEATURE(buflen), buf);
+  } else if (dir == INPUT) {
+    res = ioctl(d->fd, HIDIOCGFEATURE(buflen), buf);
+  } else{
+    return false;
+  }
+  if (res < 0) {
+    LOG(LL_ERROR, ("Could not perform feature %s: %s", (dir == OUTPUT ? "output" : "input"), strerror(errno)));
+    return false;
+  }
+  return true;
+}
+
+/* Continuously poll the driver until the controller state is idle
+ * Note: no timeout (yet)
+ */
+static bool ft260_i2c_wait(struct ft260_dev *d) {
+  uint8_t status = 0;
+
+  // Wait for the controller to be ready
+  while (!(status & FT260_STATUS_IDLE)) {
+    if (!ft260_i2c_get_status(d, &status)) {
+      return false;
+    }
+    usleep(100);
+  }
+  if (status & FT260_STATUS_IDLE) {
+    LOG(LL_DEBUG, ("Status: I2C Idle"));
+    return true;
+  }
+  return false;
+}
+
 char *ft260_get_hidpath(const unsigned short vendor_id, const unsigned short product_id, const unsigned short interface_id) {
   struct udev *           udev;
   struct udev_enumerate * enumerate;
@@ -88,81 +135,6 @@ char *ft260_get_hidpath(const unsigned short vendor_id, const unsigned short pro
   udev_enumerate_unref(enumerate);
   udev_unref(udev);
   return ret_path;
-}
-
-/* Send or retrieve a feature to/from the HID.
- *
- * direction:  0 is output, 1 = input
- * buf/buflen: Will write or read 'buflen' bytes from/to 'buf'.
- *
- * Returns true if successful, false otherwise.
- */
-static bool ft260_hid_io(struct ft260_dev *d, const enum ft260_feature_direction dir, uint8_t *buf, uint8_t buflen) {
-  int res;
-
-  if (!d || d->fd < 0) {
-    return false;
-  }
-  if (dir == OUTPUT) {
-    res = ioctl(d->fd, HIDIOCSFEATURE(buflen), buf);
-  } else if (dir == INPUT) {
-    res = ioctl(d->fd, HIDIOCGFEATURE(buflen), buf);
-  } else{
-    return false;
-  }
-  if (res < 0) {
-    LOG(LL_ERROR, ("Could not perform feature %s: %s", (dir == OUTPUT ? "output" : "input"), strerror(errno)));
-    return false;
-  }
-  return true;
-}
-
-bool ft260_i2c_get_speed(struct ft260_dev *d, uint16_t *freq_khz) {
-  uint8_t status = 0;
-
-  if (!ft260_i2c_get_status(d, &status)) {
-    return false;
-  }
-  if (freq_khz) {
-    *freq_khz = d->freq_khz;
-  }
-  return true;
-}
-
-bool ft260_i2c_get_status(struct ft260_dev *d, uint8_t *status) {
-  uint8_t buf[5];
-
-  memset(buf, 0, sizeof(buf));
-  buf[0] = 0xC0; // GET STATUS
-  if (!ft260_hid_io(d, INPUT, buf, sizeof(buf))) {
-    return false;
-  }
-
-  d->freq_khz  = ((uint16_t)buf[2]) << 8;
-  d->freq_khz += buf[3];
-  if (status) {
-    *status = buf[1];
-  }
-  return true;
-}
-
-bool ft260_i2c_set_speed(struct ft260_dev *d, const uint16_t freq_khz) {
-  uint8_t buf[4];
-
-  memset(buf, 0, sizeof(buf));
-  buf[0] = 0xA1;            // SYSTEM_SETTING_ID
-  buf[1] = 0x22;            // I2C_SPEED
-  buf[2] = freq_khz >> 8;   // MSB
-  buf[3] = freq_khz & 0xff; // LSB
-
-  if (!ft260_hid_io(d, OUTPUT, buf, sizeof(buf))) {
-    return false;
-  }
-  if (!ft260_i2c_get_status(d, NULL)) {
-    return false;
-  }
-
-  return freq_khz == d->freq_khz;
 }
 
 struct ft260_dev *ft260_i2c_create(const char *devpath) {
@@ -259,6 +231,69 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
   return d;
 }
 
+bool ft260_i2c_destroy(struct ft260_dev **d) {
+  if (!(*d)) {
+    return false;
+  }
+  if ((*d)->fd != -1) {
+    close((*d)->fd);
+  }
+  if ((*d)->devpath) {
+    free((*d)->devpath);
+  }
+  free(*d);
+  *d = NULL;
+  return true;
+}
+
+bool ft260_i2c_get_status(struct ft260_dev *d, uint8_t *status) {
+  uint8_t buf[5];
+
+  memset(buf, 0, sizeof(buf));
+  buf[0] = 0xC0; // GET STATUS
+  if (!ft260_hid_io(d, INPUT, buf, sizeof(buf))) {
+    return false;
+  }
+
+  d->freq_khz  = ((uint16_t)buf[2]) << 8;
+  d->freq_khz += buf[3];
+  if (status) {
+    *status = buf[1];
+  }
+  return true;
+}
+
+bool ft260_i2c_get_speed(struct ft260_dev *d, uint16_t *freq_khz) {
+  uint8_t status = 0;
+
+  if (!ft260_i2c_get_status(d, &status)) {
+    return false;
+  }
+  if (freq_khz) {
+    *freq_khz = d->freq_khz;
+  }
+  return true;
+}
+
+bool ft260_i2c_set_speed(struct ft260_dev *d, const uint16_t freq_khz) {
+  uint8_t buf[4];
+
+  memset(buf, 0, sizeof(buf));
+  buf[0] = 0xA1;            // SYSTEM_SETTING_ID
+  buf[1] = 0x22;            // I2C_SPEED
+  buf[2] = freq_khz >> 8;   // MSB
+  buf[3] = freq_khz & 0xff; // LSB
+
+  if (!ft260_hid_io(d, OUTPUT, buf, sizeof(buf))) {
+    return false;
+  }
+  if (!ft260_i2c_get_status(d, NULL)) {
+    return false;
+  }
+
+  return freq_khz == d->freq_khz;
+}
+
 bool ft260_i2c_reset(struct ft260_dev *d) {
   uint8_t buf[2];
 
@@ -266,23 +301,6 @@ bool ft260_i2c_reset(struct ft260_dev *d) {
   buf[0] = 0xA1;            /* SYSTEM_SETTING_ID */
   buf[1] = 0x20;            /* RESET_I2C */
   return ft260_hid_io(d, OUTPUT, buf, sizeof(buf));
-}
-
-static bool ft260_i2c_wait(struct ft260_dev *d) {
-  uint8_t status = 0;
-
-  // Wait for the controller to be ready
-  while (!(status & FT260_STATUS_IDLE)) {
-    if (!ft260_i2c_get_status(d, &status)) {
-      return false;
-    }
-    usleep(100);
-  }
-  if (status & FT260_STATUS_IDLE) {
-    LOG(LL_DEBUG, ("Status: I2C Idle"));
-    return true;
-  }
-  return false;
 }
 
 bool ft260_i2c_read(struct ft260_dev *d, uint16_t addr, void *data, size_t len, bool stop) {
@@ -415,20 +433,5 @@ bool ft260_i2c_write(struct ft260_dev *d, uint16_t addr, const void *data, size_
   if (status & FT260_STATUS_BUS_BUSY) {
     LOG(LL_DEBUG, ("Status: I2C Bus Busy"));
   }
-  return true;
-}
-
-bool ft260_i2c_destroy(struct ft260_dev **d) {
-  if (!(*d)) {
-    return false;
-  }
-  if ((*d)->fd != -1) {
-    close((*d)->fd);
-  }
-  if ((*d)->devpath) {
-    free((*d)->devpath);
-  }
-  free(*d);
-  *d = NULL;
   return true;
 }
