@@ -101,19 +101,19 @@ void ft260_i2c_stop(struct ft260_dev *d);
 
 /*
  * Helper for reading 1-byte register `reg` from a device at address `addr`.
- * In case of success return a numeric byte value from 0x00 to 0xff; otherwise
- * return -1.
+ * In case of success return a numeric byte value from 0x00 to 0xff in `*value`;
+ * otherwise return false.
  */
-int ft260_i2c_read_reg_b(struct ft260_dev *d, uint16_t addr, uint8_t reg);
+bool ft260_i2c_read_reg_b(struct ft260_dev *d, uint16_t addr, uint8_t reg, uint8_t *value);
 
 /*
  * Helper for reading 2-byte register `reg` from a device at address `addr`.
- * In case of success returns a numeric big-endian value: e.g. if 0x01, 0x02
+ * In case of success returns a numeric big-endian *value: e.g. if 0x01, 0x02
  * was read from a device, 0x0102 will be returned.
  *
- * In case of error returns -1.
+ * In case of error returns false.
  */
-int ft260_i2c_read_reg_w(struct ft260_dev *d, uint16_t addr, uint8_t reg);
+bool ft260_i2c_read_reg_w(struct ft260_dev *d, uint16_t addr, uint8_t reg, uint16_t *value);
 
 /*
  * Helper for reading `n`-byte register value from a device. Returns true on
