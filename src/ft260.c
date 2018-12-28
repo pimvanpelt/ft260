@@ -23,12 +23,12 @@ static const char *ft260_bus_type_str(int bus) {
 
 /* Send or retrieve a feature to/from the HID.
  *
- * direction:  0 is output, 1 = input
+ * direction:  OUTPUT is output (write to HID), INPUT = input (read from HID)
  * buf/buflen: Will write or read 'buflen' bytes from/to 'buf'.
  *
  * Returns true if successful, false otherwise.
  */
-static bool ft260_hid_io(struct ft260_dev *d, const enum ft260_feature_direction dir, uint8_t *buf, uint8_t buflen) {
+static bool ft260_feature_io(struct ft260_dev *d, const enum ft260_feature_direction dir, uint8_t *buf, uint8_t buflen) {
   int res;
 
   if (!d || d->fd < 0) {
@@ -181,7 +181,7 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
   // Read the chip ID
   memset(buf, 0, sizeof(buf));
   buf[0] = 0xA0; // CHIP_VERSION_ID
-  if (!ft260_hid_io(d, INPUT, buf, 13)) {
+  if (!ft260_feature_io(d, INPUT, buf, 13)) {
     LOG(LL_ERROR, ("Could not read FT260 chip ID"));
     close(d->fd);
     free(d);
@@ -192,7 +192,7 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
   // Read the System Status
   memset(buf, 0, sizeof(buf));
   buf[0] = 0xA1; // SYSTEM_STATUS_ID
-  if (!ft260_hid_io(d, INPUT, buf, 26)) {
+  if (!ft260_feature_io(d, INPUT, buf, 26)) {
     LOG(LL_ERROR, ("Could not read FT260 system status"));
     close(d->fd);
     free(d);
@@ -212,7 +212,7 @@ struct ft260_dev *ft260_i2c_create(const char *devpath) {
   buf[0] = 0xA1; // SYSTEM_SETTING_ID
   buf[1] = 0x02; // I2C_MODE
   buf[2] = 1;    // Enable
-  if (!ft260_hid_io(d, OUTPUT, buf, 3)) {
+  if (!ft260_feature_io(d, OUTPUT, buf, 3)) {
     LOG(LL_ERROR, ("Could not set mode to I2C"));
     close(d->fd);
     free(d);
@@ -251,7 +251,7 @@ bool ft260_i2c_get_status(struct ft260_dev *d, uint8_t *status) {
 
   memset(buf, 0, sizeof(buf));
   buf[0] = 0xC0; // GET STATUS
-  if (!ft260_hid_io(d, INPUT, buf, sizeof(buf))) {
+  if (!ft260_feature_io(d, INPUT, buf, sizeof(buf))) {
     return false;
   }
 
@@ -284,7 +284,7 @@ bool ft260_i2c_set_speed(struct ft260_dev *d, const uint16_t freq_khz) {
   buf[2] = freq_khz >> 8;   // MSB
   buf[3] = freq_khz & 0xff; // LSB
 
-  if (!ft260_hid_io(d, OUTPUT, buf, sizeof(buf))) {
+  if (!ft260_feature_io(d, OUTPUT, buf, sizeof(buf))) {
     return false;
   }
   if (!ft260_i2c_get_status(d, NULL)) {
@@ -300,7 +300,7 @@ bool ft260_i2c_reset(struct ft260_dev *d) {
   memset(buf, 0, sizeof(buf));
   buf[0] = 0xA1;            /* SYSTEM_SETTING_ID */
   buf[1] = 0x20;            /* RESET_I2C */
-  return ft260_hid_io(d, OUTPUT, buf, sizeof(buf));
+  return ft260_feature_io(d, OUTPUT, buf, sizeof(buf));
 }
 
 bool ft260_i2c_read(struct ft260_dev *d, uint16_t addr, void *data, size_t len, bool stop) {
